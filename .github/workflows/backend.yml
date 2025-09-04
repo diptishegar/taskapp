@@ -64,7 +64,7 @@ jobs:
             if [ -f /opt/taskapp/backend/app.jar ]; then
             sudo cp /opt/taskapp/backend/app.jar /opt/taskapp/backend/app.jar.bak
             fi
-            sudo cp /tmp/app.jar /opt/taskapp/backend/app.jar
+            sudo cp -r /tmp/app.jar /opt/taskapp/backend/app.jar
          
             pwd
             sudo chown ec2-user:ec2-user /opt/taskapp/backend/app.jar
