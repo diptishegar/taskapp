@@ -1,0 +1,39 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [ mytaskapp ]
+    paths:
+      - 'taskapp/frontend-angular/**'
+      - '.github/workflows/frontend.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: frontend-mytaskapp
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify dist/ exists
+        run: |
+          test -d taskapp/frontend-angular/dist/tasks-angular/browser || { echo "taskapp/frontend/dist not found. Build locally and commit or add a build step."; exit 1; }
+          ls -lah taskapp/frontend-angular/dist/tasks-angular/browser || true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to S3
+        env:
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+        run: |
+          aws s3 sync taskapp/frontend-angular/dist/tasks-angular/browser "s3://${S3_BUCKET}" --delete
+          echo "Deployed to s3://${S3_BUCKET}"

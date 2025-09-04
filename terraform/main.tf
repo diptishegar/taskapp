@@ -8,7 +8,7 @@ data "aws_subnets" "default" {
     values = [data.aws_vpc.default.id]
   }
 }
-
+/*
 # ---- IAM Role for EC2 ----
 resource "aws_iam_role" "ec2_role" {
   name = "${var.project_tag}-ec2-role"
@@ -141,7 +141,7 @@ resource "aws_instance" "db" {
   vpc_security_group_ids = [aws_security_group.db_sg.id]
   tags                   = { Name = "${var.project_tag}-ec2-db" }
 }
-
+*/
 # ---- S3 Bucket for frontend ----
 resource "aws_s3_bucket" "frontend" {
   bucket = var.bucket_name
