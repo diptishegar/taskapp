@@ -62,8 +62,10 @@ jobs:
             LATEST=$(ls -t /tmp/*.jar | head -1)
             if [ -f /opt/taskapp/backend/app.jar ]; then sudo cp /opt/taskapp/backend/app.jar /opt/taskapp/backend/app.jar.bak; fi
             ls -lh
+            pwd
             sudo mv "$LATEST" /opt/taskapp/backend/app.jar
             ls -lh
+            pwd
             sudo chown ec2-user:ec2-user /opt/taskapp/backend/app.jar
             sudo systemctl daemon-reload || true
             sudo systemctl restart taskapp
