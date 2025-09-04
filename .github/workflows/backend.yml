@@ -58,7 +58,7 @@ jobs:
             set -e
             sudo mkdir -p /opt/taskapp/backend
             # pick the newest jar we just uploaded
-            LATEST=$(ls -t /tmp/*.jar | head -1)
+            LATEST=$(ls -t /tmp/taskapp/backend/target/*.jar | head -1)
             if [ -f /opt/taskapp/backend/app.jar ]; then sudo cp /opt/taskapp/backend/app.jar /opt/taskapp/backend/app.jar.bak; fi
             sudo mv "$LATEST" /opt/taskapp/backend/app.jar
             sudo chown ec2-user:ec2-user /opt/taskapp/backend/app.jar
