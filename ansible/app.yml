@@ -1,0 +1,85 @@
+---
+- hosts: app
+  become: true
+  vars_files: [group_vars/all.yml]
+  vars:
+    workdir: /opt/taskapp
+
+  tasks:
+    - name: Update package index
+      ansible.builtin.yum:
+        name: "*"
+        state: latest
+
+    - name: Install base packages (no curl to avoid conflict)
+      ansible.builtin.yum:
+        name:
+          - git
+          - unzip
+          - tar
+        state: present
+
+    - name: Install Java 17 and Maven
+      ansible.builtin.yum:
+        name:
+          - java-17-amazon-corretto-devel
+          - maven
+        state: present
+
+    - name: Install AWS CLI v2
+      ansible.builtin.shell: |
+        if ! command -v aws >/dev/null 2>&1; then
+          curl -Ls https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
+          cd /tmp && unzip -o awscliv2.zip && sudo ./aws/install
+        fi
+
+    - name: Clone repo
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ workdir }}/src"
+        version: "{{ repo_branch }}"
+        force: yes
+        update: yes
+
+    - name: Build backend JAR
+      ansible.builtin.shell: mvn -q -DskipTests clean package
+      args:
+        chdir: "{{ workdir }}/src/backend"
+
+    - name: Place JAR
+      ansible.builtin.shell: |
+        mkdir -p {{ workdir }}/backend
+        cp {{ workdir }}/src/backend/target/*.jar {{ workdir }}/backend/app.jar
+
+    - name: Copy wrapper script
+      ansible.builtin.copy:
+        src: files/taskapp-start.sh
+        dest: /usr/local/bin/taskapp-start.sh
+        mode: "0755"
+
+    - name: Create systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/taskapp.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=TaskApp Spring Boot Service
+          Wants=network-online.target
+          After=network.target
+
+          [Service]
+          User=ec2-user
+          WorkingDirectory={{ workdir }}/backend
+          Environment="JAVA_OPTS=-Xms128m -Xmx512m"
+          Environment=SPRING_DATASOURCE_URL=jdbc:mysql://{{ db_host }}:3306/{{ db_name }}
+          Environment=SPRING_DATASOURCE_USERNAME=taskuser
+          Environment="SPRING_DATASOURCE_PASSWORD=123benhart#$"
+          ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/taskapp/backend/app.jar
+
+          Restart=always
+          RestartSec=5
+          LimitNOFILE=65536
+          TimeoutStopSec=20
+
+          [Install]
+          WantedBy=multi-user.target

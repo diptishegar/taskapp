@@ -1,0 +1,130 @@
+New project additions :
+
+1) Lock down SSH with SSM Session Manager (no port 22) — $0
+
+Why it impresses: shows security-first ops and IAM mastery.
+What to do (quick):
+
+Attach an IAM role to both EC2s with AmazonSSMManagedInstanceCore.
+
+In SGs, remove port 22.
+
+Connect from console: Systems Manager → Session Manager → Start session.
+(Amazon Linux 2023 already has the SSM agent.)
+
+
+2) Parameter Store for secrets (DB password) — ~$0
+
+Put password in SSM Parameter Store (SecureString), e.g. /taskapp/db/password.
+
+Change ExecStart to a tiny wrapper that fetches it at start:
+
+# /usr/local/bin/taskapp-start.sh
+DB_PASS=$(aws ssm get-parameter --name "/taskapp/db/password" --with-decryption --query Parameter.Value --output text)
+exec /usr/bin/java $JAVA_OPTS -jar /opt/taskapp/backend/app.jar \
+  --spring.datasource.password="$DB_PASS"
+
+
+In taskapp.service:
+
+ExecStart=/usr/local/bin/taskapp-start.sh
+Environment=SPRING_DATASOURCE_USERNAME=taskuser
+Environment=SPRING_DATASOURCE_URL=jdbc:mysql://<EC2B_PRIVATE_IP>:3306/taskdb
+
+Give EC2-A role GetParameter permission on that path.
+
+
+9) DB hardening quickies — free
+
+Create a non-root DB user (you already did).
+
+Disable remote root login (mysql_secure_installation).
+
+bind-address=0.0.0.0 but restrict SG to only EC2-A.
+
+10) README + Architecture Diagram
+
+Why it impresses: communication is a skill.
+Include:
+
+ASCII (or PNG) diagram of S3 → EC2-A → EC2-B.
+
+“How to run” (Terraform/Ansible steps) and “How to deploy” (CI steps).
+
+“Ops runbook” (restart service, rotate secret, restore backup).
+
+Terraform will create:
+EC2-A (App) → backend JAR
+EC2-B (DB) → MariaDB
+IAM role/profile → attach to EC2s
+S3 bucket → frontend hosting
+SGs → least-privilege rules
+
+
+--------  Terraform commands :  ---------
+terraform init
+terrform validate 
+terrform fmt
+terraform plan \
+  -var key_name=taskapp-key \
+  -var bucket_name="taskapp-frontend-dipti-2025"
+terraform apply \
+  -var key_name=taskapp-key \
+  -var bucket_name="taskapp-frontend-dipti-2025"
+terraform destroy -auto-approve \
+  -var key_name=taskapp-key \
+  -var bucket_name="taskapp-frontend-dipti-2025"
+
+
+ec2a_public_ip = "50.19.189.187"
+ec2b_private_ip = "172.31.23.111"
+ec2b_public_ip = "34.201.149.91"
+s3_website_url = "taskapp-frontend-dipti-2025.s3-website-us-east-1.amazonaws.com"
+
+
+s3_website_url = "taskapp-frontend-dipti-2025.s3-website-us-east-1.amazonaws.com"
+
+aws ssm get-parameter --name "/taskapp/db/password" --with-decryption
+
+
+ssh -i taskapp-key.pem ec2-user@44.220.134.252
+
+--------  Ansible commands :  ----------
+Ping Test
+ansible -i inventory.ini all -m ping --key-file taskapp-key.pem
+
+ansible-playbook -i inventory.ini app.yml --key-file taskapp-key.pem --start-at-task="Build backend JAR with Java 17 override"
+
+
+---------  Ansible Playbook cmds  ---------  
+ansible-playbook -i inventory.ini db.yml --key-file taskapp-key.pem
+ansible-playbook -i inventory.ini app.yml --key-file taskapp-key.pem
+
+-------  Testing : After the ansible playbook running  -----------
+
+sudo systemctl status taskapp
+
+mysql -h 172.31.23.111 -u taskuser -p -e "SHOW DATABASES;"
+
+curl -i http://50.19.189.187:3030
+
+Test the S3 bucket link
+
+sudo dnf install -y mariadb105-server mariadb105
+sudo systemctl enable --now mariadb
+
+http://taskapp-frontend-dipti-2025.s3-website-us-east-1.amazonaws.com
+
+[Service]
+Environment=SPRING_DATASOURCE_URL=jdbc:mysql://<EC2B_PRIVATE_IP>:3306/taskdb
+Environment=SPRING_DATASOURCE_USERNAME=taskuser
+Environment=SSM_DB_PASS_PARAM=/taskapp/db/password
+
+
+java -jar app.jar \
+  --spring.datasource.url=jdbc:mysql://172.31.23.111:3306/taskdb \
+  --spring.datasource.username=taskuser \
+  --spring.datasource.password=123benhart#$ 
+
+
+cat /etc/systemd/system/taskapp.service

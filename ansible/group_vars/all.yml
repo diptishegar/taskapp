@@ -1,0 +1,11 @@
+project_tag: taskapp
+repo_url: "https://github.com/diptishegar/taskapp.git"
+repo_branch: "spring-angular"
+
+db_host: "172.31.23.111"
+db_name: "taskdb"
+db_user: "taskuser"
+ssm_db_pass_param: "/taskapp/db/password"
+
+s3_bucket: "taskapp-frontend-dipti-2025"
+api_url: "http://50.19.189.187:3030"
