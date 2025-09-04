@@ -57,12 +57,15 @@ jobs:
           script: |
             set -e
             sudo mkdir -p /opt/taskapp/backend
-            ls -lh
+      
             # pick the newest jar we just uploaded
             pwd
             cd ~
-            sudo mv /tmp/app.jar /opt/taskapp/backend/app.jar
-            ls -lh
+            if [ -f /opt/taskapp/backend/app.jar ]; then
+            sudo cp /opt/taskapp/backend/app.jar /opt/taskapp/backend/app.jar.bak
+            fi
+            sudo cp /tmp/app.jar /opt/taskapp/backend/app.jar
+         
             pwd
             sudo chown ec2-user:ec2-user /opt/taskapp/backend/app.jar
             sudo systemctl daemon-reload || true
