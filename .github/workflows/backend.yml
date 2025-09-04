@@ -64,6 +64,7 @@ jobs:
             ls -lh
             pwd
             cd ~
+            echo $LATEST
             sudo mv "$LATEST" /opt/taskapp/backend/app.jar
             ls -lh
             pwd
