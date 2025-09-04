@@ -65,7 +65,7 @@ jobs:
             sudo cp /opt/taskapp/backend/app.jar /opt/taskapp/backend/app.jar.bak
             fi
             sudo rm -rf /opt/taskapp/backend/app.jar
-            sudo cp -r /tmp/app_upload/*.jar /opt/taskapp/backend/app.jar
+            sudo cp -r /tmp/app_upload/taskapp/backend/target/*.jar /opt/taskapp/backend/app.jar
          
             pwd
             sudo chown ec2-user:ec2-user /opt/taskapp/backend/app.jar
