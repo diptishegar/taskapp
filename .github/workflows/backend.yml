@@ -1,5 +1,4 @@
 name: Backend CI/CD
-
 on:
   push:
     branches: [ mytaskapp ]
@@ -7,24 +6,20 @@ on:
       - 'taskapp/backend/**'
       - '.github/workflows/backend.yml'
   workflow_dispatch:
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     concurrency:
       group: backend-mytaskapp
       cancel-in-progress: true
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Cache Maven
         uses: actions/cache@v4
         with:
@@ -43,18 +38,30 @@ jobs:
       - name: Show built JAR locally (debug)
         run: |
           echo "LOCAL: Listing backend/target"
-          ls -lah taskapp/backend/target || true
+          pwd
 
+      - name: Prepare remote directory
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_APP_IP }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            # Clean and recreate upload directory
+            sudo rm -rf /tmp/app_upload
+            mkdir -p /tmp/app_upload
+            chmod 755 /tmp/app_upload
+            echo "Created /tmp/app_upload with proper permissions"
+            
       - name: Upload JAR to EC2 (/tmp/app_upload)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_APP_IP }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          source: "taskapp/backend/target/*.jar"   # <-- CORRECT path for your repo
-          target: "/tmp/app_upload"                # <-- directory on remote
+          source: "taskapp/backend/target/*.jar"
+          target: "/tmp/app_upload"
           overwrite: true
-
       - name: Deploy & restart service
         uses: appleboy/ssh-action@v0.1.10
         with:
@@ -63,34 +70,31 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             set -euo pipefail
-
             echo "REMOTE: show /tmp/app_upload"
             ls -lah /tmp/app_upload || true
-
-            # ensure the jar arrived
-            if ! ls /tmp/app_upload/*.jar >/dev/null 2>&1; then
+            # Show the full directory structure to debug
+            find /tmp/app_upload -name "*.jar" || true
+            # ensure the jar arrived - check in subdirectories too
+            JAR_PATH=$(find /tmp/app_upload -name "*.jar" | head -1)
+            if [ -z "$JAR_PATH" ]; then
               echo "ERROR: no jar found under /tmp/app_upload"
-              ls -lah /tmp || true
+              find /tmp/app_upload -type f || true
               exit 1
             fi
-
+            echo "Found JAR at: $JAR_PATH"
             # stop the service (if running)
             sudo systemctl stop taskapp || true
-
             # prepare target dir and ownership
             sudo mkdir -p /opt/taskapp/backend
             sudo chown ec2-user:ec2-user /opt/taskapp/backend
-
             # backup the old jar if present
             if [ -f /opt/taskapp/backend/app.jar ]; then
               echo "Backing up existing app.jar"
               sudo cp /opt/taskapp/backend/app.jar /opt/taskapp/backend/app.jar.bak || true
             fi
-
-            # copy new jar into place (no -r)
-            sudo cp /tmp/app_upload/*.jar /opt/taskapp/backend/app.jar
+            # copy new jar into place using the found path
+            sudo cp "$JAR_PATH" /opt/taskapp/backend/app.jar
             sudo chown ec2-user:ec2-user /opt/taskapp/backend/app.jar
             sudo chmod 0644 /opt/taskapp/backend/app.jar || true
-
             sudo systemctl daemon-reload || true
             sudo systemctl start taskapp
