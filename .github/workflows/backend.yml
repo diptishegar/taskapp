@@ -71,4 +71,3 @@ jobs:
             sudo chown ec2-user:ec2-user /opt/taskapp/backend/app.jar
             sudo systemctl daemon-reload || true
             sudo systemctl restart taskapp
-            sleep 3
