@@ -1,3 +1,9 @@
 taskapp-key.pem
 terraform/.terraform
 ".git"/
+
+create_folder.py
+interview-notes.sql
+login-creds.sql
+phase-diagram.png
+TaskApp.sql
