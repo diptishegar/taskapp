@@ -1,6 +1,5 @@
 taskapp-key.pem
 terraform/.terraform
-".git"/
 *.jpg
 *.sql
-*.py
+create_folder.py
