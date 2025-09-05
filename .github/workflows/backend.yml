@@ -38,7 +38,7 @@ jobs:
           mvn -q -DskipTests clean package -Dmaven.compiler.release=17 -f taskapp/backend/pom.xml
           ls -lh taskapp/backend/target/*.jar
 
-      - name: Upload JAR to EC2 (/tmp/app.jar)
+      - name: Upload JAR to EC2 (/tmp/app_upload/*.jar)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_APP_IP }}
