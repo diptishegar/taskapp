@@ -28,7 +28,8 @@ jobs:
       - name: Cache Maven
         uses: actions/cache@v4
         with:
-          path: ~/.m2/repository
+          path: |
+            ~/.m2/repository
           key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             m2-${{ runner.os }}-
@@ -36,38 +37,60 @@ jobs:
       - name: Build JAR (skip tests)
         run: |
           mvn -q -DskipTests clean package -Dmaven.compiler.release=17 -f taskapp/backend/pom.xml
-          ls -lh taskapp/backend/target/*.jar
+          echo "Build finished. Listing target:"
+          ls -lah taskapp/backend/target || true
 
-      - name: Upload JAR to EC2 (/tmp/app_upload/*.jar)
+      - name: Show built JAR locally (debug)
+        run: |
+          echo "LOCAL: Listing backend/target"
+          ls -lah taskapp/backend/target || true
+
+      - name: Upload JAR to EC2 (/tmp/app_upload)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_APP_IP }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          source: "taskapp/backend/target/*.jar"
-          target: "/tmp/app_upload"
+          source: "taskapp/backend/target/*.jar"   # <-- CORRECT path for your repo
+          target: "/tmp/app_upload"                # <-- directory on remote
           overwrite: true
 
-      - name: Restart backend service
+      - name: Deploy & restart service
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.EC2_APP_IP }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            set -e
-            sudo mkdir -p /opt/taskapp/backend
-      
-            # pick the newest jar we just uploaded
-            pwd
-            cd ~
-            if [ -f /opt/taskapp/backend/app.jar ]; then
-            sudo cp /opt/taskapp/backend/app.jar /opt/taskapp/backend/app.jar.bak
+            set -euo pipefail
+
+            echo "REMOTE: show /tmp/app_upload"
+            ls -lah /tmp/app_upload || true
+
+            # ensure the jar arrived
+            if ! ls /tmp/app_upload/*.jar >/dev/null 2>&1; then
+              echo "ERROR: no jar found under /tmp/app_upload"
+              ls -lah /tmp || true
+              exit 1
             fi
-            sudo rm -rf /opt/taskapp/backend/app.jar
-            sudo cp -r /tmp/app_upload/taskapp/backend/target/*.jar /opt/taskapp/backend/app.jar
-         
-            pwd
+
+            # stop the service (if running)
+            sudo systemctl stop taskapp || true
+
+            # prepare target dir and ownership
+            sudo mkdir -p /opt/taskapp/backend
+            sudo chown ec2-user:ec2-user /opt/taskapp/backend
+
+            # backup the old jar if present
+            if [ -f /opt/taskapp/backend/app.jar ]; then
+              echo "Backing up existing app.jar"
+              sudo cp /opt/taskapp/backend/app.jar /opt/taskapp/backend/app.jar.bak || true
+            fi
+
+            # copy new jar into place (no -r)
+            sudo cp /tmp/app_upload/*.jar /opt/taskapp/backend/app.jar
             sudo chown ec2-user:ec2-user /opt/taskapp/backend/app.jar
+            sudo chmod 0644 /opt/taskapp/backend/app.jar || true
+
             sudo systemctl daemon-reload || true
-            sudo systemctl restart taskapp
+            sudo systemctl start taskapp
