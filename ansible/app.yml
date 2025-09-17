@@ -72,10 +72,9 @@
           WorkingDirectory={{ workdir }}/backend
           Environment="JAVA_OPTS=-Xms128m -Xmx512m"
           Environment=SPRING_DATASOURCE_URL=jdbc:mysql://{{ db_host }}:3306/{{ db_name }}
-          Environment=SPRING_DATASOURCE_USERNAME=taskuser
-          Environment="SPRING_DATASOURCE_PASSWORD=123benhart#$"
-          ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/taskapp/backend/app.jar
-
+          Environment=SPRING_DATASOURCE_USERNAME={{ db_user }}
+          Environment=SSM_DB_PASS_PARAM={{ ssm_db_pass_param }}
+          ExecStart=/usr/local/bin/taskapp-start.sh
           Restart=always
           RestartSec=5
           LimitNOFILE=65536
